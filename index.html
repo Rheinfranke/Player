@@ -6,112 +6,176 @@
 <title>Videorekorder</title>
 <style>
   :root {
-    --bg: #14161a; --panel: #1d2026; --line: #2c3038; --text: #e8e9ec;
-    --muted: #9aa0aa; --accent: #3d8bfd; --rec: #e5484d; --ok: #30a46c;
+    --bg: #14161a; --panel: #1d2026; --line: #2c3038; --text: #eceef1;
+    --muted: #a3a9b3; --accent: #3d8bfd; --rec: #e5484d; --ok: #30a46c; --warn: #f5a524;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
-  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
-  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
-  .tabs { margin-left: auto; display: flex; gap: 6px; }
-  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 18px; }
-  .panel h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  video { width: 100%; max-height: 62vh; background: #000; border-radius: 8px; display: block; }
-  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
-  label { color: var(--muted); font-size: 13px; }
-  select, button { font: inherit; color: var(--text); background: #262a31; border: 1px solid var(--line); border-radius: 7px; padding: 8px 12px; }
-  select { max-width: 260px; }
+  body { margin: 0; font: 17px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 12px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  header h1 { font-size: 20px; margin: 0; font-weight: 700; }
+  .tabs { display: flex; gap: 8px; }
+  .tab { font-size: 17px; padding: 10px 18px; }
+  #recBadge { margin-left: auto; color: #fff; background: var(--rec); padding: 6px 12px; border-radius: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  main { max-width: 1100px; margin: 0 auto; padding: 18px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+
+  #msg { border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; font-weight: 600; border-left: 6px solid var(--accent); background: #1b2a42; }
+  #msg.ok { border-color: var(--ok); background: #14301f; }
+  #msg.warn { border-color: var(--warn); background: #3a2d10; }
+  #msg.error { border-color: var(--rec); background: #3d1618; }
+
+  .stage { position: relative; }
+  video { width: 100%; max-height: 60vh; background: #000; border-radius: 10px; display: block; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(0,0,0,.65); border-radius: 10px; text-align: center; padding: 20px; }
+  .overlay p { margin: 0; color: var(--muted); }
+
+  button, select { font: inherit; color: var(--text); background: #272b33; border: 2px solid var(--line); border-radius: 9px; padding: 10px 16px; }
   button { cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--accent); }
-  button:disabled { opacity: .45; cursor: default; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.rec { background: var(--rec); border-color: var(--rec); color: #fff; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  button.big { font-size: 22px; padding: 16px 30px; border-radius: 12px; }
   button.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .status { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
-  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--rec); margin-right: 6px; animation: blink 1s infinite; vertical-align: middle; }
-  @keyframes blink { 50% { opacity: .2; } }
-  .seek { width: 100%; margin-top: 12px; accent-color: var(--accent); }
-  .time { font-variant-numeric: tabular-nums; color: var(--muted); }
+  select { max-width: 100%; }
+
+  .meter { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .meter .lbl { font-weight: 700; min-width: 40px; }
+  .bar { flex: 1; height: 26px; background: #0d0f12; border: 1px solid var(--line); border-radius: 6px; position: relative; overflow: hidden; }
+  .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: linear-gradient(90deg, var(--ok) 0%, var(--ok) 65%, var(--warn) 82%, var(--rec) 100%); background-size: var(--full, 100%) 100%; transition: width 60ms linear; }
+  .bar .peak { position: absolute; top: 0; bottom: 0; width: 3px; background: #fff; left: 0; opacity: .8; }
+  .bar .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.12); }
+  #audioState { min-width: 230px; font-weight: 700; }
+  #audioState.ok { color: var(--ok); } #audioState.warn { color: var(--warn); } #audioState.error { color: var(--rec); }
+
+  .recrow { display: flex; align-items: center; gap: 16px; margin-top: 18px; flex-wrap: wrap; }
+  #btnRec { font-size: 24px; padding: 18px 34px; border-radius: 14px; font-weight: 800; color: #fff; background: var(--rec); border-color: var(--rec); min-width: 320px; }
+  #btnRec.stop { background: #fff; color: var(--rec); border-color: #fff; }
+  #recTime { font-size: 26px; font-variant-numeric: tabular-nums; font-weight: 700; }
+
+  details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: max-content 1fr; gap: 10px 14px; align-items: center; margin-top: 12px; }
+  .grid label { color: var(--muted); }
+  .check { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+  .check input { width: 22px; height: 22px; }
+
+  .seek { width: 100%; margin-top: 14px; height: 28px; accent-color: var(--accent); }
+  .ctrl { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  .ctrl button { font-size: 19px; padding: 12px 18px; font-weight: 700; }
+  #btnPlay { min-width: 170px; }
+  .time { margin-left: auto; font-size: 19px; font-variant-numeric: tabular-nums; color: var(--muted); }
+
   .list { list-style: none; margin: 0; padding: 0; }
-  .list li { display: flex; align-items: center; gap: 10px; padding: 10px 6px; border-top: 1px solid var(--line); }
+  .list li { display: flex; align-items: center; gap: 12px; padding: 12px 6px; border-top: 1px solid var(--line); flex-wrap: wrap; }
   .list li:first-child { border-top: none; }
-  .list li.playing .name { color: var(--accent); }
-  .name { font-family: ui-monospace, Consolas, monospace; }
-  .meta { color: var(--muted); font-size: 13px; }
-  .list .actions { margin-left: auto; display: flex; gap: 6px; }
-  .list button { padding: 5px 10px; font-size: 13px; }
-  .empty { color: var(--muted); padding: 8px 0; }
-  .hint { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .list li.playing { background: #1b2a42; border-radius: 8px; }
+  .name { font-family: ui-monospace, Consolas, monospace; font-size: 16px; }
+  .meta { color: var(--muted); font-size: 14px; }
+  .list .actions { margin-left: auto; display: flex; gap: 8px; }
+  .list .actions button { padding: 8px 14px; font-size: 15px; }
+  .empty { color: var(--muted); }
+  .hint { color: var(--muted); font-size: 14px; margin: 10px 0 0; }
   .hidden { display: none !important; }
-  kbd { background: #262a31; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+  kbd { background: #272b33; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; font-size: 13px; }
+  #storage { color: var(--muted); font-size: 14px; margin-left: auto; }
+  #storage.warn { color: var(--warn); font-weight: 700; }
 </style>
 </head>
 <body>
 <header>
   <h1>Videorekorder</h1>
   <div class="tabs">
-    <button class="tab active" data-view="record">Aufnahme</button>
-    <button class="tab" data-view="player">Player</button>
+    <button class="tab active" data-view="record">1. Aufnehmen</button>
+    <button class="tab" data-view="player">2. Anschauen</button>
   </div>
+  <span id="recBadge" class="hidden">● AUFNAHME LÄUFT 0:00</span>
 </header>
 
 <main>
-  <!-- AUFNAHME -->
+  <!-- ================= AUFNEHMEN ================= -->
   <section id="view-record">
     <div class="panel">
-      <h2>Videosignal</h2>
-      <video id="preview" autoplay muted playsinline></video>
-      <div class="row">
-        <label for="videoSrc">Kamera</label>
-        <select id="videoSrc"></select>
-        <label for="audioSrc">Mikrofon</label>
-        <select id="audioSrc"></select>
-        <button id="btnStart" class="primary">Signal starten</button>
-        <button id="btnScreen">Bildschirm aufnehmen</button>
+      <div id="msg">Willkommen. Klicke auf „Kamera einschalten“.</div>
+
+      <div class="stage">
+        <video id="preview" autoplay muted playsinline></video>
+        <div id="camOverlay" class="overlay">
+          <button id="btnStart" class="primary big">Kamera einschalten</button>
+          <p>Der Browser fragt dann, ob die Seite Kamera und Mikrofon benutzen darf.<br>Bitte auf <b>„Zulassen“</b> klicken.</p>
+        </div>
       </div>
-      <div class="row">
-        <button id="btnRec" class="rec" disabled>● Aufnahme starten</button>
-        <button id="btnStop" disabled>■ Aufnahme beenden</button>
-        <span id="recStatus" class="status">Bereit</span>
+
+      <div class="meter">
+        <span class="lbl">Ton</span>
+        <div class="bar" id="bar">
+          <div class="fill" id="fill"></div>
+          <div class="peak" id="peak"></div>
+        </div>
+        <span id="audioState">Noch kein Signal</span>
       </div>
-      <p class="hint">Aufnahmen werden im Browser gespeichert (IndexedDB) und tragen den Zeitstempel des Aufnahmebeginns als Namen. Über „Herunterladen“ legst du sie zusätzlich als Datei ab.</p>
+      <p class="hint">Der Balken muss sich bewegen, wenn du sprichst. Die Vorschau selbst ist stumm, damit es nicht pfeift.</p>
+
+      <div class="recrow">
+        <button id="btnRec" disabled>● AUFNAHME STARTEN</button>
+        <span id="recTime"></span>
+      </div>
+
+      <details>
+        <summary>Andere Kamera oder anderes Mikrofon wählen</summary>
+        <div class="grid">
+          <label for="videoSrc">Kamera</label>
+          <select id="videoSrc" disabled><option>Erst Kamera einschalten</option></select>
+          <label for="audioSrc">Mikrofon</label>
+          <select id="audioSrc" disabled><option>Erst Kamera einschalten</option></select>
+        </div>
+        <div class="check">
+          <input type="checkbox" id="autoDl" checked>
+          <label for="autoDl">Jede Aufnahme nach dem Beenden automatisch in den Ordner „Downloads“ speichern</label>
+        </div>
+        <div class="check">
+          <button id="btnScreen">Stattdessen den Bildschirm aufnehmen</button>
+        </div>
+      </details>
     </div>
   </section>
 
-  <!-- PLAYER -->
+  <!-- ================= ANSCHAUEN ================= -->
   <section id="view-player" class="hidden">
     <div class="panel">
-      <h2 id="nowPlaying">Kein Video gewählt</h2>
+      <h2 id="nowPlaying">Wähle unten eine Aufnahme aus</h2>
       <video id="player" playsinline></video>
-      <input id="seek" class="seek" type="range" min="0" max="0" step="0.1" value="0">
-      <div class="row">
+      <input id="seek" class="seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Position">
+      <div class="ctrl">
         <button id="btnBack30">« 30 s</button>
         <button id="btnBack10">‹ 10 s</button>
         <button id="btnPlay" class="primary">▶ Abspielen</button>
         <button id="btnFwd10">10 s ›</button>
         <button id="btnFwd30">30 s »</button>
-        <select id="speed" title="Geschwindigkeit">
+        <select id="speed" aria-label="Geschwindigkeit">
           <option value="0.5">0,5×</option>
-          <option value="1" selected>1×</option>
+          <option value="1" selected>1× normal</option>
           <option value="1.5">1,5×</option>
           <option value="2">2×</option>
         </select>
         <button id="btnFull">Vollbild</button>
-        <span id="time" class="status time">0:00 / 0:00</span>
+        <span id="time" class="time">0:00 / 0:00</span>
       </div>
-      <p class="hint">Tastatur: <kbd>Leertaste</kbd> Start/Pause, <kbd>←</kbd> 10 s zurück, <kbd>Umschalt</kbd>+<kbd>←</kbd> 30 s zurück, <kbd>→</kbd> 10 s vor, <kbd>F</kbd> Vollbild</p>
+      <p class="hint">Tastatur: <kbd>Leertaste</kbd> Abspielen/Pause · <kbd>←</kbd> 10 s zurück · <kbd>Umschalt</kbd>+<kbd>←</kbd> 30 s zurück · <kbd>→</kbd> 10 s vor · <kbd>F</kbd> Vollbild</p>
     </div>
   </section>
 
-  <!-- LISTE (immer sichtbar) -->
+  <!-- ================= LISTE ================= -->
   <div class="panel">
-    <h2>Aufnahmen</h2>
-    <div class="row" style="margin-top:0;margin-bottom:8px">
-      <button id="btnOpenFile">Videodatei öffnen …</button>
+    <div class="ctrl" style="margin-top:0;margin-bottom:10px">
+      <h2 style="margin:0">Gespeicherte Aufnahmen</h2>
+      <span id="storage"></span>
+    </div>
+    <ul id="list" class="list"><li class="empty">Wird geladen …</li></ul>
+    <div class="ctrl">
+      <button id="btnOpenFile">Andere Videodatei vom Computer öffnen …</button>
       <input id="fileInput" type="file" accept="video/*" class="hidden">
     </div>
-    <ul id="list" class="list"></ul>
   </div>
 </main>
 
@@ -120,229 +184,419 @@
   "use strict";
   const $ = (id) => document.getElementById(id);
 
-  // ---------- IndexedDB ----------
-  const DB_NAME = "videorekorder", STORE = "recordings";
-  let db;
+  /* ============ Meldungen ============ */
+  function msg(text, type = "") {
+    const el = $("msg");
+    el.className = type;
+    el.innerHTML = text;
+  }
+
+  /* ============ Speicher (IndexedDB) ============
+     recordings: fertige Aufnahmen
+     parts:      laufende Aufnahme, sekundenweise gesichert (Absturzschutz) */
+  let db = null;
   function openDB() {
     return new Promise((res, rej) => {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: "name" });
+      const req = indexedDB.open("videorekorder", 2);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains("recordings")) d.createObjectStore("recordings", { keyPath: "name" });
+        if (!d.objectStoreNames.contains("parts")) {
+          d.createObjectStore("parts", { autoIncrement: true }).createIndex("name", "name");
+        }
+      };
       req.onsuccess = () => res(req.result);
       req.onerror = () => rej(req.error);
     });
   }
-  function tx(mode, fn) {
+  function tx(store, mode, fn) {
     return new Promise((res, rej) => {
-      const t = db.transaction(STORE, mode);
-      const r = fn(t.objectStore(STORE));
+      const t = db.transaction(store, mode);
+      const r = fn(t.objectStore(store));
       t.oncomplete = () => res(r && r.result);
       t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
     });
   }
-  const dbPut = (rec) => tx("readwrite", (s) => s.put(rec));
-  const dbDel = (name) => tx("readwrite", (s) => s.delete(name));
-  const dbAll = () => tx("readonly", (s) => s.getAll());
-
-  // ---------- Hilfsfunktionen ----------
-  const pad = (n) => String(n).padStart(2, "0");
-  function timestampName(d) {
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_` +
-           `${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  const recPut = (r) => tx("recordings", "readwrite", (s) => s.put(r));
+  const recDel = (n) => tx("recordings", "readwrite", (s) => s.delete(n));
+  const recAll = () => tx("recordings", "readonly", (s) => s.getAll());
+  const partPut = (p) => tx("parts", "readwrite", (s) => s.add(p));
+  const partAll = () => tx("parts", "readonly", (s) => s.getAll());
+  const partClear = () => tx("parts", "readwrite", (s) => s.clear());
+  function partDelName(name) {
+    return tx("parts", "readwrite", (s) => {
+      s.index("name").openKeyCursor(IDBKeyRange.only(name)).onsuccess = (e) => {
+        const c = e.target.result;
+        if (c) { s.delete(c.primaryKey); c.continue(); }
+      };
+    });
   }
+
+  /* ============ Hilfsfunktionen ============ */
+  const pad = (n) => String(n).padStart(2, "0");
+  const tsName = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
   function fmtTime(s) {
     if (!isFinite(s) || s < 0) s = 0;
     s = Math.floor(s);
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-    return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    return h ? `${h}:${pad(m)}:${pad(x)}` : `${m}:${pad(x)}`;
   }
-  function fmtSize(b) {
-    return b > 1e9 ? (b / 1e9).toFixed(2) + " GB" : (b / 1e6).toFixed(1) + " MB";
-  }
+  const fmtSize = (b) => (b >= 1e9 ? (b / 1e9).toFixed(2).replace(".", ",") + " GB" : (b / 1e6).toFixed(1).replace(".", ",") + " MB");
   function pickMime() {
-    const candidates = [
-      "video/mp4;codecs=avc1,mp4a.40.2",
-      "video/mp4",
-      "video/webm;codecs=vp9,opus",
-      "video/webm;codecs=vp8,opus",
-      "video/webm"
-    ];
-    return candidates.find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
+    const c = ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+    return c.find((m) => MediaRecorder.isTypeSupported(m)) || "";
   }
   const extFor = (mime) => (mime.startsWith("video/mp4") ? "mp4" : "webm");
+  const store = {
+    get: (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (_) { return d; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} }
+  };
 
-  // ---------- Tabs ----------
+  /* ============ Ansichten ============ */
   document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
   function showView(v) {
     document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
     $("view-record").classList.toggle("hidden", v !== "record");
     $("view-player").classList.toggle("hidden", v !== "player");
+    if (v === "record" && !player.paused) player.pause();
   }
 
-  // ---------- Aufnahme ----------
+  /* ============ Kamera & Mikrofon ============ */
   const preview = $("preview");
-  let stream = null, recorder = null, chunks = [], recStart = null, recTimer = null, recName = "";
+  let stream = null, starting = false;
 
-  async function listDevices() {
-    try {
-      const devs = await navigator.mediaDevices.enumerateDevices();
-      const fill = (sel, kind, none) => {
-        const cur = sel.value;
-        sel.innerHTML = "";
-        if (none) sel.add(new Option("Kein Ton", ""));
-        devs.filter((d) => d.kind === kind).forEach((d, i) =>
-          sel.add(new Option(d.label || `${kind === "videoinput" ? "Kamera" : "Mikrofon"} ${i + 1}`, d.deviceId)));
-        if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
-      };
-      fill($("videoSrc"), "videoinput", false);
-      fill($("audioSrc"), "audioinput", true);
-      if ($("audioSrc").options.length > 1 && !$("audioSrc").dataset.touched) $("audioSrc").selectedIndex = 1;
-    } catch (e) { console.warn(e); }
-  }
-  $("audioSrc").addEventListener("change", (e) => (e.target.dataset.touched = "1"));
-
-  function stopStream() {
-    if (stream) stream.getTracks().forEach((t) => t.stop());
-    stream = null;
-    preview.srcObject = null;
+  function explainError(e, what) {
+    const n = e && e.name;
+    if (n === "NotAllowedError" || n === "SecurityError")
+      return `Der Zugriff auf ${what} wurde <b>blockiert</b>.<br>So behebst du es: Oben links in der Adresszeile auf das <b>Schloss-Symbol</b> (oder Kamera-Symbol) klicken, Kamera und Mikrofon auf <b>„Zulassen“</b> stellen und die Seite neu laden (Taste <kbd>F5</kbd>).`;
+    if (n === "NotFoundError" || n === "OverconstrainedError")
+      return `Es wurde <b>keine ${what}</b> gefunden. Ist das Gerät eingesteckt? Danach die Seite neu laden (<kbd>F5</kbd>).`;
+    if (n === "NotReadableError" || n === "AbortError")
+      return `${what} wird gerade von einem <b>anderen Programm</b> benutzt (zum Beispiel Teams, Zoom, Skype oder ein anderer Browser-Tab). Dieses Programm schließen und nochmal auf „Kamera einschalten“ klicken.`;
+    return `Unbekannter Fehler bei ${what}: ${e && e.message ? e.message : e}`;
   }
 
-  async function startCamera() {
-    if (recorder && recorder.state === "recording") return;
-    stopStream();
-    const v = $("videoSrc").value, a = $("audioSrc").value;
+  async function getMedia(videoId, audioId) {
+    const video = videoId ? { deviceId: { exact: videoId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+                          : { width: { ideal: 1920 }, height: { ideal: 1080 } };
+    const audio = audioId === "none" ? false
+                : audioId ? { deviceId: { exact: audioId }, echoCancellation: false, noiseSuppression: false, autoGainControl: true }
+                : { echoCancellation: false, noiseSuppression: false, autoGainControl: true };
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: v ? { deviceId: { exact: v }, width: { ideal: 1920 }, height: { ideal: 1080 } } : { width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: $("audioSrc").options.length === 0 ? true : (a ? { deviceId: { exact: a } } : false)
-      });
-      attachStream();
-      await listDevices();
+      return { s: await navigator.mediaDevices.getUserMedia({ video, audio }), noMic: false };
     } catch (e) {
-      setStatus("Kein Zugriff auf Kamera: " + e.message);
+      // Mit Ton klappt es nicht: Bild alleine versuchen, damit wenigstens das Bild da ist
+      if (audio && (e.name === "NotFoundError" || e.name === "NotReadableError" || e.name === "OverconstrainedError")) {
+        const s = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+        return { s, noMic: true, micErr: e };
+      }
+      throw e;
     }
+  }
+
+  async function startCamera(videoId, audioId) {
+    if (starting || isRecording()) return;
+    starting = true;
+    $("btnStart").disabled = true;
+    ensureAudioCtx();
+    msg("Kamera wird eingeschaltet … Falls der Browser fragt: bitte <b>„Zulassen“</b> klicken.");
+    try {
+      const { s, noMic, micErr } = await getMedia(videoId, audioId);
+      setStream(s);
+      await fillDevices();
+      if (audioId === "none") msg("Kamera läuft. <b>Ton ist absichtlich ausgeschaltet.</b>", "warn");
+      else if (noMic) msg("Bild ist da, aber <b>kein Mikrofon</b>. " + explainError(micErr, "das Mikrofon"), "error");
+      else msg("Alles bereit. Sprich kurz und schau, ob sich der Ton-Balken bewegt. Dann auf <b>„Aufnahme starten“</b> klicken.", "ok");
+    } catch (e) {
+      msg(explainError(e, "die Kamera"), "error");
+      $("btnStart").disabled = false;
+    }
+    starting = false;
   }
 
   async function startScreen() {
-    if (recorder && recorder.state === "recording") return;
+    if (isRecording()) return;
+    if (!navigator.mediaDevices.getDisplayMedia) { msg("Dieser Browser kann den Bildschirm nicht aufnehmen.", "error"); return; }
+    ensureAudioCtx();
     try {
       const scr = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      const a = $("audioSrc").value;
-      if (a) {
+      // Mikrofon dazunehmen, wenn die Freigabe selbst keinen Ton liefert
+      if (scr.getAudioTracks().length === 0) {
         try {
-          const mic = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: a } } });
-          if (scr.getAudioTracks().length === 0) mic.getAudioTracks().forEach((t) => scr.addTrack(t));
-          else mic.getTracks().forEach((t) => t.stop());
+          const a = $("audioSrc").value;
+          const mic = await navigator.mediaDevices.getUserMedia({ audio: a && a !== "none" ? { deviceId: { exact: a } } : true });
+          mic.getAudioTracks().forEach((t) => scr.addTrack(t));
         } catch (_) {}
       }
-      stopStream();
-      stream = scr;
-      stream.getVideoTracks()[0].addEventListener("ended", () => {
-        if (recorder && recorder.state === "recording") stopRecording();
-        stopStream();
-        $("btnRec").disabled = true;
-        setStatus("Bildschirmfreigabe beendet");
-      });
-      attachStream();
-    } catch (e) {
-      setStatus("Bildschirmaufnahme abgebrochen");
+      setStream(scr);
+      msg("Bildschirm wird angezeigt. Zum Zurückwechseln auf die Kamera unter „Andere Kamera“ eine Kamera auswählen.", "ok");
+    } catch (_) {
+      msg("Bildschirmfreigabe wurde abgebrochen.", "warn");
     }
   }
 
-  function attachStream() {
-    preview.srcObject = stream;
+  function setStream(s) {
+    if (stream && stream !== s) stream.getTracks().forEach((t) => t.stop());
+    stream = s;
+    preview.srcObject = s;
+    $("camOverlay").classList.add("hidden");
     $("btnRec").disabled = false;
-    setStatus("Signal aktiv");
+    connectMeter(s);
+    s.getTracks().forEach((t) => t.addEventListener("ended", () => onTrackEnded(t)));
   }
 
-  function setStatus(t, recording) {
-    $("recStatus").innerHTML = (recording ? '<span class="dot"></span>' : "") + t;
+  function onTrackEnded(t) {
+    if (!stream || !stream.getTracks().includes(t)) return;
+    if (isRecording()) {
+      stopRecording();
+      msg(`Das ${t.kind === "video" ? "Bild" : "Mikrofon"} ist plötzlich weg (Kabel raus?). Die Aufnahme bis hierhin wurde <b>gespeichert</b>.`, "error");
+    } else {
+      msg(`Das ${t.kind === "video" ? "Bild" : "Mikrofon"} ist weg. Gerät prüfen und auf „Kamera einschalten“ klicken.`, "error");
+    }
+    if (t.kind === "video") {
+      stream.getTracks().forEach((x) => x.stop());
+      stream = null;
+      preview.srcObject = null;
+      $("btnRec").disabled = true;
+      $("btnStart").disabled = false;
+      $("camOverlay").classList.remove("hidden");
+      connectMeter(null);
+    } else {
+      connectMeter(stream);
+    }
   }
 
-  function startRecording() {
-    if (!stream) return;
+  async function fillDevices() {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const vSel = $("videoSrc"), aSel = $("audioSrc");
+    const curV = stream && stream.getVideoTracks()[0] ? stream.getVideoTracks()[0].getSettings().deviceId : "";
+    const curA = stream && stream.getAudioTracks()[0] ? stream.getAudioTracks()[0].getSettings().deviceId : "none";
+    vSel.innerHTML = ""; aSel.innerHTML = "";
+    devs.filter((d) => d.kind === "videoinput").forEach((d, i) => vSel.add(new Option(d.label || `Kamera ${i + 1}`, d.deviceId)));
+    devs.filter((d) => d.kind === "audioinput").forEach((d, i) => aSel.add(new Option(d.label || `Mikrofon ${i + 1}`, d.deviceId)));
+    aSel.add(new Option("Kein Ton (Mikrofon aus)", "none"));
+    if ([...vSel.options].some((o) => o.value === curV)) vSel.value = curV;
+    if ([...aSel.options].some((o) => o.value === curA)) aSel.value = curA;
+    vSel.disabled = aSel.disabled = isRecording();
+  }
+
+  $("btnStart").addEventListener("click", () => startCamera(store.get("videoId", ""), store.get("audioId", "")));
+  $("btnScreen").addEventListener("click", startScreen);
+  $("videoSrc").addEventListener("change", (e) => { store.set("videoId", e.target.value); startCamera(e.target.value, $("audioSrc").value); });
+  $("audioSrc").addEventListener("change", (e) => { store.set("audioId", e.target.value); startCamera($("videoSrc").value, e.target.value); });
+  $("autoDl").checked = store.get("autoDl", "1") === "1";
+  $("autoDl").addEventListener("change", (e) => store.set("autoDl", e.target.checked ? "1" : "0"));
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener)
+    navigator.mediaDevices.addEventListener("devicechange", () => stream && fillDevices());
+
+  /* ============ Tonpegel ============ */
+  let actx = null, analyser = null, srcNode = null, buf = null, peakHold = 0, peakTime = 0, lastLoud = 0, hasAudio = false;
+  function ensureAudioCtx() {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      actx = new AC();
+      analyser = actx.createAnalyser();
+      analyser.fftSize = 2048;
+      buf = new Float32Array(analyser.fftSize);
+      requestAnimationFrame(drawMeter);
+    }
+    if (actx.state === "suspended") actx.resume();
+  }
+  function connectMeter(s) {
+    if (srcNode) { try { srcNode.disconnect(); } catch (_) {} srcNode = null; }
+    hasAudio = !!(s && s.getAudioTracks().length);
+    lastLoud = performance.now();
+    if (hasAudio && actx) {
+      srcNode = actx.createMediaStreamSource(new MediaStream(s.getAudioTracks()));
+      srcNode.connect(analyser);
+    }
+  }
+  // Skalenstriche bei -40, -20, -10, -6 dB
+  [-40, -20, -10, -6].forEach((db) => {
+    const t = document.createElement("div");
+    t.className = "tick";
+    t.style.left = ((db + 60) / 60 * 100) + "%";
+    $("bar").appendChild(t);
+  });
+  function setAudioState(text, cls) {
+    const el = $("audioState");
+    if (el.textContent !== text) el.textContent = text;
+    el.className = cls;
+  }
+  function drawMeter() {
+    requestAnimationFrame(drawMeter);
+    const now = performance.now();
+    let pct = 0;
+    if (!stream) {
+      setAudioState("Noch kein Signal", "");
+    } else if (!hasAudio) {
+      setAudioState("✗ KEIN MIKROFON", "error");
+    } else if (analyser && srcNode) {
+      analyser.getFloatTimeDomainData(buf);
+      let peak = 0;
+      for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i]); if (v > peak) peak = v; }
+      const db = peak > 0 ? 20 * Math.log10(peak) : -100;
+      pct = Math.max(0, Math.min(100, (db + 60) / 60 * 100));
+      if (db > -45) lastLoud = now;
+      const tr = stream.getAudioTracks()[0];
+      if (tr && (tr.muted || !tr.enabled)) setAudioState("✗ Mikrofon ist stumm geschaltet", "error");
+      else if (db > -1) setAudioState("⚠ Zu laut, übersteuert", "warn");
+      else if (now - lastLoud > 4000) setAudioState("⚠ Kein Ton zu hören. Mikrofon stumm?", "warn");
+      else setAudioState("✓ Ton kommt an", "ok");
+    }
+    const fill = $("fill");
+    fill.style.width = pct + "%";
+    fill.style.setProperty("--full", pct > 0 ? (100 / pct * 100) + "%" : "100%");
+    if (pct >= peakHold || now - peakTime > 1500) { peakHold = pct; peakTime = now; }
+    $("peak").style.left = `calc(${peakHold}% - 3px)`;
+  }
+
+  /* ============ Aufnahme ============ */
+  let recorder = null, chunks = [], recStart = 0, recName = "", recMime = "", recTimer = null, wakeLock = null, partSeq = Promise.resolve();
+  const isRecording = () => !!(recorder && recorder.state === "recording");
+
+  async function startRecording() {
+    if (!stream || isRecording()) return;
+    if (!hasAudio && !confirm("ACHTUNG: Es ist kein Mikrofon aktiv. Die Aufnahme hat dann KEINEN TON.\n\nTrotzdem ohne Ton aufnehmen?")) return;
     const mime = pickMime();
     try {
-      recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 5_000_000 } : undefined);
+      recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 5000000, audioBitsPerSecond: 128000 } : undefined);
     } catch (e) {
-      setStatus("Aufnahme nicht möglich: " + e.message);
+      msg("Die Aufnahme konnte nicht gestartet werden: " + e.message, "error");
       return;
     }
     chunks = [];
-    recStart = new Date();
-    recName = timestampName(recStart);
-    recorder.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
-    recorder.onstop = saveRecording;
+    recStart = Date.now();
+    recName = tsName(new Date(recStart));
+    recMime = (recorder.mimeType || mime || "video/webm").split(";")[0];
+    partSeq = Promise.resolve();
+    recorder.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      chunks.push(e.data);
+      if (db) { const p = { name: recName, mime: recMime, start: recStart, data: e.data }; partSeq = partSeq.then(() => partPut(p)).catch(() => {}); }
+    };
+    recorder.onstop = finishRecording;
+    recorder.onerror = (e) => { msg("Fehler während der Aufnahme. Was bis hierhin aufgenommen wurde, wird gespeichert.", "error"); stopRecording(); };
     recorder.start(1000);
-    $("btnRec").disabled = true;
-    $("btnStop").disabled = false;
-    $("btnStart").disabled = $("btnScreen").disabled = $("videoSrc").disabled = $("audioSrc").disabled = true;
-    recTimer = setInterval(() => setStatus(`${recName}  ·  ${fmtTime((Date.now() - recStart) / 1000)}`, true), 250);
+    try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); } catch (_) {}
+    setRecUI(true);
+    msg(`Aufnahme läuft: <b>${recName}</b>. Zum Beenden auf den weißen Knopf klicken.`, "error");
   }
 
   function stopRecording() {
-    if (recorder && recorder.state !== "inactive") recorder.stop();
-    clearInterval(recTimer);
-    $("btnStop").disabled = true;
-    $("btnRec").disabled = !stream;
-    $("btnStart").disabled = $("btnScreen").disabled = $("videoSrc").disabled = $("audioSrc").disabled = false;
+    if (!isRecording()) return;
+    try { recorder.requestData(); } catch (_) {}
+    recorder.stop();
+    setRecUI(false);
+    msg("Aufnahme wird gespeichert … bitte kurz warten.");
   }
 
-  async function saveRecording() {
-    const mime = (recorder.mimeType || "video/webm").split(";")[0];
-    const blob = new Blob(chunks, { type: mime });
-    const duration = (Date.now() - recStart) / 1000;
-    const rec = { name: recName, ext: extFor(mime), mime, blob, size: blob.size, created: recStart.getTime(), duration };
-    try {
-      await dbPut(rec);
-      setStatus(`Gespeichert: ${recName}.${rec.ext}`);
-    } catch (e) {
-      setStatus("Speichern im Browser fehlgeschlagen, Datei wird heruntergeladen");
-      download(rec);
+  function setRecUI(on) {
+    const b = $("btnRec");
+    b.classList.toggle("stop", on);
+    b.textContent = on ? "■ AUFNAHME BEENDEN" : "● AUFNAHME STARTEN";
+    $("recBadge").classList.toggle("hidden", !on);
+    $("videoSrc").disabled = $("audioSrc").disabled = $("btnScreen").disabled = on;
+    clearInterval(recTimer);
+    if (on) {
+      const tick = () => {
+        const t = fmtTime((Date.now() - recStart) / 1000);
+        $("recTime").textContent = "● " + t;
+        $("recBadge").textContent = "● AUFNAHME LÄUFT " + t;
+      };
+      tick();
+      recTimer = setInterval(tick, 500);
+    } else {
+      $("recTime").textContent = "";
+      if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
     }
+  }
+
+  async function finishRecording() {
+    const blob = new Blob(chunks, { type: recMime });
+    const rec = { name: recName, ext: extFor(recMime), mime: recMime, blob, size: blob.size, created: recStart, duration: (Date.now() - recStart) / 1000 };
     chunks = [];
+    let savedLocal = false;
+    try {
+      if (db) { await recPut(rec); savedLocal = true; await partSeq; await partDelName(rec.name); }
+    } catch (_) {}
+    let text = `Fertig: <b>${rec.name}.${rec.ext}</b> (${fmtTime(rec.duration)}, ${fmtSize(rec.size)})`;
+    if ($("autoDl").checked || !savedLocal) {
+      download(rec);
+      text += ` wurde im Ordner <b>„Downloads“</b> gespeichert`;
+      text += savedLocal ? " und steht unten in der Liste." : ".";
+    } else {
+      text += " steht unten in der Liste.";
+    }
+    if (!savedLocal) text += " (Im Browser war kein Platz mehr, deshalb nur als Download.)";
+    msg(text, "ok");
     renderList();
   }
 
-  $("btnStart").addEventListener("click", startCamera);
-  $("btnScreen").addEventListener("click", startScreen);
-  $("videoSrc").addEventListener("change", () => stream && startCamera());
-  $("audioSrc").addEventListener("change", () => stream && startCamera());
-  $("btnRec").addEventListener("click", startRecording);
-  $("btnStop").addEventListener("click", stopRecording);
-  window.addEventListener("beforeunload", (e) => {
-    if (recorder && recorder.state === "recording") { e.preventDefault(); e.returnValue = ""; }
-  });
+  $("btnRec").addEventListener("click", () => (isRecording() ? stopRecording() : startRecording()));
+  window.addEventListener("beforeunload", (e) => { if (isRecording()) { e.preventDefault(); e.returnValue = ""; } });
 
-  // ---------- Liste ----------
+  /* ============ Abgestürzte Aufnahmen retten ============ */
+  async function recoverParts() {
+    const parts = await partAll();
+    if (!parts.length) return 0;
+    const groups = {};
+    parts.forEach((p) => (groups[p.name] = groups[p.name] || []).push(p));
+    const existing = new Set((await recAll()).map((r) => r.name));
+    let n = 0;
+    for (const name in groups) {
+      if (existing.has(name)) continue;
+      const g = groups[name];
+      const blob = new Blob(g.map((p) => p.data), { type: g[0].mime });
+      await recPut({ name, ext: extFor(g[0].mime), mime: g[0].mime, blob, size: blob.size, created: g[0].start, duration: g.length, recovered: true });
+      n++;
+    }
+    await partClear();
+    return n;
+  }
+
+  /* ============ Liste ============ */
   let currentName = null;
   async function renderList() {
-    const items = (await dbAll()).sort((a, b) => b.created - a.created);
     const ul = $("list");
+    if (!db) return;
+    const items = (await recAll()).sort((a, b) => b.created - a.created);
     ul.innerHTML = "";
-    if (!items.length) {
-      ul.innerHTML = '<li class="empty">Noch keine Aufnahmen vorhanden.</li>';
-      return;
-    }
+    if (!items.length) { ul.innerHTML = '<li class="empty">Noch keine Aufnahmen vorhanden.</li>'; }
     for (const r of items) {
       const li = document.createElement("li");
       if (r.name === currentName) li.classList.add("playing");
-      li.innerHTML = `<div><div class="name">${r.name}.${r.ext}</div>
-        <div class="meta">${fmtTime(r.duration)} · ${fmtSize(r.size)}</div></div>
+      li.innerHTML = `<div><div class="name">${r.name}.${r.ext}${r.recovered ? " (gerettet)" : ""}</div>
+        <div class="meta">Dauer ${fmtTime(r.duration)} · ${fmtSize(r.size)}</div></div>
         <div class="actions">
-          <button data-a="play">▶ Abspielen</button>
+          <button data-a="play" class="primary">▶ Anschauen</button>
           <button data-a="dl">Herunterladen</button>
           <button data-a="del">Löschen</button>
         </div>`;
       li.querySelector('[data-a="play"]').onclick = () => loadVideo(r.blob, `${r.name}.${r.ext}`, r.name, r.duration);
       li.querySelector('[data-a="dl"]').onclick = () => download(r);
       li.querySelector('[data-a="del"]').onclick = async () => {
-        if (!confirm(`Aufnahme ${r.name} löschen?`)) return;
+        if (!confirm(`Aufnahme „${r.name}“ wirklich löschen?\n\nSie ist dann aus dieser Liste weg. Eine bereits heruntergeladene Datei im Ordner „Downloads“ bleibt erhalten.`)) return;
         if (currentName === r.name) unloadVideo();
-        await dbDel(r.name);
+        await recDel(r.name);
         renderList();
       };
       ul.appendChild(li);
     }
+    showStorage();
+  }
+
+  async function showStorage() {
+    if (!navigator.storage || !navigator.storage.estimate) return;
+    try {
+      const { usage, quota } = await navigator.storage.estimate();
+      const free = quota - usage, el = $("storage");
+      el.textContent = `Belegt ${fmtSize(usage)} · frei etwa ${fmtSize(free)}`;
+      el.classList.toggle("warn", free < 1e9);
+      if (free < 1e9) el.textContent += "  ⚠ Speicher wird knapp, bitte alte Aufnahmen löschen";
+    } catch (_) {}
   }
 
   function download(r) {
@@ -353,40 +607,44 @@
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
-  // ---------- Player ----------
+  /* ============ Player ============ */
   const player = $("player"), seek = $("seek");
-  let currentUrl = null, knownDuration = 0, seeking = false;
+  let currentUrl = null, knownDuration = 0, dragging = false;
+  player.muted = false;
+  player.volume = 1;
 
-  function duration() {
-    return isFinite(player.duration) && player.duration > 0 ? player.duration : knownDuration;
-  }
+  const duration = () => (isFinite(player.duration) && player.duration > 0 ? player.duration : knownDuration);
 
   function loadVideo(blob, title, name, dur) {
     if (currentUrl) URL.revokeObjectURL(currentUrl);
     currentUrl = URL.createObjectURL(blob);
     currentName = name || null;
     knownDuration = dur || 0;
+    player.muted = false;
     player.src = currentUrl;
     $("nowPlaying").textContent = title;
     showView("player");
     renderList();
-    // WebM aus MediaRecorder hat oft keine Dauerangabe: Trick, damit Spulen funktioniert
+    // WebM-Aufnahmen haben oft keine Längenangabe. Kurz ans Ende springen, dann kennt der Browser sie.
     player.addEventListener("loadedmetadata", function fix() {
       player.removeEventListener("loadedmetadata", fix);
       if (!isFinite(player.duration)) {
+        const wasPlaying = !player.paused;
         player.currentTime = 1e101;
         player.addEventListener("timeupdate", function back() {
           player.removeEventListener("timeupdate", back);
           player.currentTime = 0;
+          if (wasPlaying) player.play().catch(() => {});
           updateTime();
         });
       }
       updateTime();
     });
     player.play().catch(() => {});
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function unloadVideo() {
@@ -395,38 +653,40 @@
     player.load();
     if (currentUrl) URL.revokeObjectURL(currentUrl);
     currentUrl = currentName = null;
-    $("nowPlaying").textContent = "Kein Video gewählt";
+    knownDuration = 0;
+    $("nowPlaying").textContent = "Wähle unten eine Aufnahme aus";
     updateTime();
   }
 
+  const hasVideo = () => !!player.getAttribute("src");
   function jump(sec) {
-    if (!player.src) return;
+    if (!hasVideo()) return;
     const d = duration();
     let t = player.currentTime + sec;
-    t = Math.max(0, d ? Math.min(t, d - 0.05) : t);
+    t = Math.max(0, d ? Math.min(t, d - 0.1) : t);
     player.currentTime = t;
     updateTime();
   }
-
   function togglePlay() {
-    if (!player.src) return;
-    player.paused ? player.play() : player.pause();
+    if (!hasVideo()) { $("nowPlaying").textContent = "Bitte zuerst unten bei einer Aufnahme auf „Anschauen“ klicken"; return; }
+    if (player.paused) { if (player.ended) player.currentTime = 0; player.play(); } else player.pause();
   }
-
   function updateTime() {
     const d = duration();
     $("time").textContent = `${fmtTime(player.currentTime)} / ${fmtTime(d)}`;
     seek.max = d || 0;
-    if (!seeking) seek.value = player.currentTime;
+    if (!dragging) seek.value = player.currentTime;
   }
 
   player.addEventListener("timeupdate", updateTime);
   player.addEventListener("durationchange", updateTime);
   player.addEventListener("play", () => ($("btnPlay").textContent = "❚❚ Pause"));
   player.addEventListener("pause", () => ($("btnPlay").textContent = "▶ Abspielen"));
+  player.addEventListener("ended", () => ($("btnPlay").textContent = "▶ Nochmal"));
   player.addEventListener("click", togglePlay);
-  seek.addEventListener("input", () => { seeking = true; $("time").textContent = `${fmtTime(seek.value)} / ${fmtTime(duration())}`; });
-  seek.addEventListener("change", () => { player.currentTime = Number(seek.value); seeking = false; });
+  player.addEventListener("error", () => { if (hasVideo()) $("nowPlaying").textContent = "Diese Datei kann der Browser leider nicht abspielen."; });
+  seek.addEventListener("input", () => { dragging = true; $("time").textContent = `${fmtTime(seek.value)} / ${fmtTime(duration())}`; });
+  seek.addEventListener("change", () => { if (hasVideo()) player.currentTime = Number(seek.value); dragging = false; });
 
   $("btnPlay").onclick = togglePlay;
   $("btnBack10").onclick = () => jump(-10);
@@ -434,18 +694,21 @@
   $("btnFwd10").onclick = () => jump(10);
   $("btnFwd30").onclick = () => jump(30);
   $("speed").onchange = (e) => (player.playbackRate = Number(e.target.value));
-  $("btnFull").onclick = () => (player.requestFullscreen ? player.requestFullscreen() : player.webkitEnterFullscreen && player.webkitEnterFullscreen());
+  $("btnFull").onclick = () => {
+    if (player.requestFullscreen) player.requestFullscreen().catch(() => {});
+    else if (player.webkitEnterFullscreen) player.webkitEnterFullscreen();
+  };
 
   document.addEventListener("keydown", (e) => {
     if ($("view-player").classList.contains("hidden")) return;
-    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) && document.activeElement !== seek) return;
+    const tag = document.activeElement && document.activeElement.tagName;
+    if ((tag === "SELECT" || tag === "TEXTAREA") || (tag === "INPUT" && document.activeElement !== seek)) return;
     if (e.code === "Space") { e.preventDefault(); togglePlay(); }
     else if (e.code === "ArrowLeft") { e.preventDefault(); jump(e.shiftKey ? -30 : -10); }
     else if (e.code === "ArrowRight") { e.preventDefault(); jump(e.shiftKey ? 30 : 10); }
     else if (e.code === "KeyF") { $("btnFull").click(); }
   });
 
-  // Externe Datei öffnen
   $("btnOpenFile").onclick = () => $("fileInput").click();
   $("fileInput").onchange = (e) => {
     const f = e.target.files[0];
@@ -453,23 +716,35 @@
     e.target.value = "";
   };
 
-  // ---------- Start ----------
+  /* ============ Start ============ */
   (async () => {
-    if (!navigator.mediaDevices || !window.MediaRecorder) {
-      setStatus("Dieser Browser unterstützt keine Videoaufnahme");
-      $("btnStart").disabled = $("btnScreen").disabled = true;
-    } else {
-      navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener("devicechange", listDevices);
-      listDevices();
-      if (!navigator.mediaDevices.getDisplayMedia) $("btnScreen").classList.add("hidden");
+    if (!window.isSecureContext) {
+      msg("Diese Seite muss über <b>https://</b> geöffnet werden (zum Beispiel über GitHub Pages). Als Datei per Doppelklick geöffnet, darf der Browser nicht auf die Kamera zugreifen.", "error");
+      $("btnStart").disabled = true;
+    } else if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+      msg("Dieser Browser kann leider keine Videos aufnehmen. Bitte <b>Google Chrome</b>, <b>Microsoft Edge</b> oder <b>Firefox</b> in aktueller Version benutzen.", "error");
+      $("btnStart").disabled = true;
     }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) $("btnScreen").classList.add("hidden");
+
     try {
       db = await openDB();
-      if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+      const n = await recoverParts();
+      if (n) msg(`Beim letzten Mal wurde die Seite während einer Aufnahme geschlossen. <b>${n === 1 ? "Die Aufnahme wurde" : n + " Aufnahmen wurden"} gerettet</b> und steht unten in der Liste.`, "warn");
       renderList();
     } catch (e) {
-      $("list").innerHTML = '<li class="empty">Browserspeicher nicht verfügbar. Aufnahmen werden direkt heruntergeladen.</li>';
+      db = null;
+      $("list").innerHTML = '<li class="empty">Der Browser erlaubt hier keinen Speicher (privates Fenster?). Aufnahmen werden deshalb direkt in den Ordner „Downloads“ gespeichert.</li>';
     }
+
+    // Wenn die Erlaubnis schon einmal erteilt wurde, Kamera gleich einschalten
+    try {
+      if (navigator.permissions && !$("btnStart").disabled) {
+        const p = await navigator.permissions.query({ name: "camera" });
+        if (p.state === "granted") $("btnStart").click();
+      }
+    } catch (_) {}
   })();
 })();
 </script>
