@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Videorekorder</title>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1d2026; --line: #2c3038; --text: #e8e9ec;
+    --muted: #9aa0aa; --accent: #3d8bfd; --rec: #e5484d; --ok: #30a46c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .tabs { margin-left: auto; display: flex; gap: 6px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 18px; }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  video { width: 100%; max-height: 62vh; background: #000; border-radius: 8px; display: block; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  label { color: var(--muted); font-size: 13px; }
+  select, button { font: inherit; color: var(--text); background: #262a31; border: 1px solid var(--line); border-radius: 7px; padding: 8px 12px; }
+  select { max-width: 260px; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.rec { background: var(--rec); border-color: var(--rec); color: #fff; }
+  button.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .status { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--rec); margin-right: 6px; animation: blink 1s infinite; vertical-align: middle; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .seek { width: 100%; margin-top: 12px; accent-color: var(--accent); }
+  .time { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { display: flex; align-items: center; gap: 10px; padding: 10px 6px; border-top: 1px solid var(--line); }
+  .list li:first-child { border-top: none; }
+  .list li.playing .name { color: var(--accent); }
+  .name { font-family: ui-monospace, Consolas, monospace; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .list .actions { margin-left: auto; display: flex; gap: 6px; }
+  .list button { padding: 5px 10px; font-size: 13px; }
+  .empty { color: var(--muted); padding: 8px 0; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .hidden { display: none !important; }
+  kbd { background: #262a31; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Videorekorder</h1>
+  <div class="tabs">
+    <button class="tab active" data-view="record">Aufnahme</button>
+    <button class="tab" data-view="player">Player</button>
+  </div>
+</header>
+
+<main>
+  <!-- AUFNAHME -->
+  <section id="view-record">
+    <div class="panel">
+      <h2>Videosignal</h2>
+      <video id="preview" autoplay muted playsinline></video>
+      <div class="row">
+        <label for="videoSrc">Kamera</label>
+        <select id="videoSrc"></select>
+        <label for="audioSrc">Mikrofon</label>
+        <select id="audioSrc"></select>
+        <button id="btnStart" class="primary">Signal starten</button>
+        <button id="btnScreen">Bildschirm aufnehmen</button>
+      </div>
+      <div class="row">
+        <button id="btnRec" class="rec" disabled>● Aufnahme starten</button>
+        <button id="btnStop" disabled>■ Aufnahme beenden</button>
+        <span id="recStatus" class="status">Bereit</span>
+      </div>
+      <p class="hint">Aufnahmen werden im Browser gespeichert (IndexedDB) und tragen den Zeitstempel des Aufnahmebeginns als Namen. Über „Herunterladen“ legst du sie zusätzlich als Datei ab.</p>
+    </div>
+  </section>
+
+  <!-- PLAYER -->
+  <section id="view-player" class="hidden">
+    <div class="panel">
+      <h2 id="nowPlaying">Kein Video gewählt</h2>
+      <video id="player" playsinline></video>
+      <input id="seek" class="seek" type="range" min="0" max="0" step="0.1" value="0">
+      <div class="row">
+        <button id="btnBack30">« 30 s</button>
+        <button id="btnBack10">‹ 10 s</button>
+        <button id="btnPlay" class="primary">▶ Abspielen</button>
+        <button id="btnFwd10">10 s ›</button>
+        <button id="btnFwd30">30 s »</button>
+        <select id="speed" title="Geschwindigkeit">
+          <option value="0.5">0,5×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.5">1,5×</option>
+          <option value="2">2×</option>
+        </select>
+        <button id="btnFull">Vollbild</button>
+        <span id="time" class="status time">0:00 / 0:00</span>
+      </div>
+      <p class="hint">Tastatur: <kbd>Leertaste</kbd> Start/Pause, <kbd>←</kbd> 10 s zurück, <kbd>Umschalt</kbd>+<kbd>←</kbd> 30 s zurück, <kbd>→</kbd> 10 s vor, <kbd>F</kbd> Vollbild</p>
+    </div>
+  </section>
+
+  <!-- LISTE (immer sichtbar) -->
+  <div class="panel">
+    <h2>Aufnahmen</h2>
+    <div class="row" style="margin-top:0;margin-bottom:8px">
+      <button id="btnOpenFile">Videodatei öffnen …</button>
+      <input id="fileInput" type="file" accept="video/*" class="hidden">
+    </div>
+    <ul id="list" class="list"></ul>
+  </div>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- IndexedDB ----------
+  const DB_NAME = "videorekorder", STORE = "recordings";
+  let db;
+  function openDB() {
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: "name" });
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+  }
+  function tx(mode, fn) {
+    return new Promise((res, rej) => {
+      const t = db.transaction(STORE, mode);
+      const r = fn(t.objectStore(STORE));
+      t.oncomplete = () => res(r && r.result);
+      t.onerror = () => rej(t.error);
+    });
+  }
+  const dbPut = (rec) => tx("readwrite", (s) => s.put(rec));
+  const dbDel = (name) => tx("readwrite", (s) => s.delete(name));
+  const dbAll = () => tx("readonly", (s) => s.getAll());
+
+  // ---------- Hilfsfunktionen ----------
+  const pad = (n) => String(n).padStart(2, "0");
+  function timestampName(d) {
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_` +
+           `${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  }
+  function fmtTime(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    s = Math.floor(s);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+  }
+  function fmtSize(b) {
+    return b > 1e9 ? (b / 1e9).toFixed(2) + " GB" : (b / 1e6).toFixed(1) + " MB";
+  }
+  function pickMime() {
+    const candidates = [
+      "video/mp4;codecs=avc1,mp4a.40.2",
+      "video/mp4",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm"
+    ];
+    return candidates.find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
+  }
+  const extFor = (mime) => (mime.startsWith("video/mp4") ? "mp4" : "webm");
+
+  // ---------- Tabs ----------
+  document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+  function showView(v) {
+    document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
+    $("view-record").classList.toggle("hidden", v !== "record");
+    $("view-player").classList.toggle("hidden", v !== "player");
+  }
+
+  // ---------- Aufnahme ----------
+  const preview = $("preview");
+  let stream = null, recorder = null, chunks = [], recStart = null, recTimer = null, recName = "";
+
+  async function listDevices() {
+    try {
+      const devs = await navigator.mediaDevices.enumerateDevices();
+      const fill = (sel, kind, none) => {
+        const cur = sel.value;
+        sel.innerHTML = "";
+        if (none) sel.add(new Option("Kein Ton", ""));
+        devs.filter((d) => d.kind === kind).forEach((d, i) =>
+          sel.add(new Option(d.label || `${kind === "videoinput" ? "Kamera" : "Mikrofon"} ${i + 1}`, d.deviceId)));
+        if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+      };
+      fill($("videoSrc"), "videoinput", false);
+      fill($("audioSrc"), "audioinput", true);
+      if ($("audioSrc").options.length > 1 && !$("audioSrc").dataset.touched) $("audioSrc").selectedIndex = 1;
+    } catch (e) { console.warn(e); }
+  }
+  $("audioSrc").addEventListener("change", (e) => (e.target.dataset.touched = "1"));
+
+  function stopStream() {
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream = null;
+    preview.srcObject = null;
+  }
+
+  async function startCamera() {
+    if (recorder && recorder.state === "recording") return;
+    stopStream();
+    const v = $("videoSrc").value, a = $("audioSrc").value;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: v ? { deviceId: { exact: v }, width: { ideal: 1920 }, height: { ideal: 1080 } } : { width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: $("audioSrc").options.length === 0 ? true : (a ? { deviceId: { exact: a } } : false)
+      });
+      attachStream();
+      await listDevices();
+    } catch (e) {
+      setStatus("Kein Zugriff auf Kamera: " + e.message);
+    }
+  }
+
+  async function startScreen() {
+    if (recorder && recorder.state === "recording") return;
+    try {
+      const scr = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      const a = $("audioSrc").value;
+      if (a) {
+        try {
+          const mic = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: a } } });
+          if (scr.getAudioTracks().length === 0) mic.getAudioTracks().forEach((t) => scr.addTrack(t));
+          else mic.getTracks().forEach((t) => t.stop());
+        } catch (_) {}
+      }
+      stopStream();
+      stream = scr;
+      stream.getVideoTracks()[0].addEventListener("ended", () => {
+        if (recorder && recorder.state === "recording") stopRecording();
+        stopStream();
+        $("btnRec").disabled = true;
+        setStatus("Bildschirmfreigabe beendet");
+      });
+      attachStream();
+    } catch (e) {
+      setStatus("Bildschirmaufnahme abgebrochen");
+    }
+  }
+
+  function attachStream() {
+    preview.srcObject = stream;
+    $("btnRec").disabled = false;
+    setStatus("Signal aktiv");
+  }
+
+  function setStatus(t, recording) {
+    $("recStatus").innerHTML = (recording ? '<span class="dot"></span>' : "") + t;
+  }
+
+  function startRecording() {
+    if (!stream) return;
+    const mime = pickMime();
+    try {
+      recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 5_000_000 } : undefined);
+    } catch (e) {
+      setStatus("Aufnahme nicht möglich: " + e.message);
+      return;
+    }
+    chunks = [];
+    recStart = new Date();
+    recName = timestampName(recStart);
+    recorder.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
+    recorder.onstop = saveRecording;
+    recorder.start(1000);
+    $("btnRec").disabled = true;
+    $("btnStop").disabled = false;
+    $("btnStart").disabled = $("btnScreen").disabled = $("videoSrc").disabled = $("audioSrc").disabled = true;
+    recTimer = setInterval(() => setStatus(`${recName}  ·  ${fmtTime((Date.now() - recStart) / 1000)}`, true), 250);
+  }
+
+  function stopRecording() {
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    clearInterval(recTimer);
+    $("btnStop").disabled = true;
+    $("btnRec").disabled = !stream;
+    $("btnStart").disabled = $("btnScreen").disabled = $("videoSrc").disabled = $("audioSrc").disabled = false;
+  }
+
+  async function saveRecording() {
+    const mime = (recorder.mimeType || "video/webm").split(";")[0];
+    const blob = new Blob(chunks, { type: mime });
+    const duration = (Date.now() - recStart) / 1000;
+    const rec = { name: recName, ext: extFor(mime), mime, blob, size: blob.size, created: recStart.getTime(), duration };
+    try {
+      await dbPut(rec);
+      setStatus(`Gespeichert: ${recName}.${rec.ext}`);
+    } catch (e) {
+      setStatus("Speichern im Browser fehlgeschlagen, Datei wird heruntergeladen");
+      download(rec);
+    }
+    chunks = [];
+    renderList();
+  }
+
+  $("btnStart").addEventListener("click", startCamera);
+  $("btnScreen").addEventListener("click", startScreen);
+  $("videoSrc").addEventListener("change", () => stream && startCamera());
+  $("audioSrc").addEventListener("change", () => stream && startCamera());
+  $("btnRec").addEventListener("click", startRecording);
+  $("btnStop").addEventListener("click", stopRecording);
+  window.addEventListener("beforeunload", (e) => {
+    if (recorder && recorder.state === "recording") { e.preventDefault(); e.returnValue = ""; }
+  });
+
+  // ---------- Liste ----------
+  let currentName = null;
+  async function renderList() {
+    const items = (await dbAll()).sort((a, b) => b.created - a.created);
+    const ul = $("list");
+    ul.innerHTML = "";
+    if (!items.length) {
+      ul.innerHTML = '<li class="empty">Noch keine Aufnahmen vorhanden.</li>';
+      return;
+    }
+    for (const r of items) {
+      const li = document.createElement("li");
+      if (r.name === currentName) li.classList.add("playing");
+      li.innerHTML = `<div><div class="name">${r.name}.${r.ext}</div>
+        <div class="meta">${fmtTime(r.duration)} · ${fmtSize(r.size)}</div></div>
+        <div class="actions">
+          <button data-a="play">▶ Abspielen</button>
+          <button data-a="dl">Herunterladen</button>
+          <button data-a="del">Löschen</button>
+        </div>`;
+      li.querySelector('[data-a="play"]').onclick = () => loadVideo(r.blob, `${r.name}.${r.ext}`, r.name, r.duration);
+      li.querySelector('[data-a="dl"]').onclick = () => download(r);
+      li.querySelector('[data-a="del"]').onclick = async () => {
+        if (!confirm(`Aufnahme ${r.name} löschen?`)) return;
+        if (currentName === r.name) unloadVideo();
+        await dbDel(r.name);
+        renderList();
+      };
+      ul.appendChild(li);
+    }
+  }
+
+  function download(r) {
+    const url = URL.createObjectURL(r.blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${r.name}.${r.ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  // ---------- Player ----------
+  const player = $("player"), seek = $("seek");
+  let currentUrl = null, knownDuration = 0, seeking = false;
+
+  function duration() {
+    return isFinite(player.duration) && player.duration > 0 ? player.duration : knownDuration;
+  }
+
+  function loadVideo(blob, title, name, dur) {
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    currentUrl = URL.createObjectURL(blob);
+    currentName = name || null;
+    knownDuration = dur || 0;
+    player.src = currentUrl;
+    $("nowPlaying").textContent = title;
+    showView("player");
+    renderList();
+    // WebM aus MediaRecorder hat oft keine Dauerangabe: Trick, damit Spulen funktioniert
+    player.addEventListener("loadedmetadata", function fix() {
+      player.removeEventListener("loadedmetadata", fix);
+      if (!isFinite(player.duration)) {
+        player.currentTime = 1e101;
+        player.addEventListener("timeupdate", function back() {
+          player.removeEventListener("timeupdate", back);
+          player.currentTime = 0;
+          updateTime();
+        });
+      }
+      updateTime();
+    });
+    player.play().catch(() => {});
+  }
+
+  function unloadVideo() {
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    currentUrl = currentName = null;
+    $("nowPlaying").textContent = "Kein Video gewählt";
+    updateTime();
+  }
+
+  function jump(sec) {
+    if (!player.src) return;
+    const d = duration();
+    let t = player.currentTime + sec;
+    t = Math.max(0, d ? Math.min(t, d - 0.05) : t);
+    player.currentTime = t;
+    updateTime();
+  }
+
+  function togglePlay() {
+    if (!player.src) return;
+    player.paused ? player.play() : player.pause();
+  }
+
+  function updateTime() {
+    const d = duration();
+    $("time").textContent = `${fmtTime(player.currentTime)} / ${fmtTime(d)}`;
+    seek.max = d || 0;
+    if (!seeking) seek.value = player.currentTime;
+  }
+
+  player.addEventListener("timeupdate", updateTime);
+  player.addEventListener("durationchange", updateTime);
+  player.addEventListener("play", () => ($("btnPlay").textContent = "❚❚ Pause"));
+  player.addEventListener("pause", () => ($("btnPlay").textContent = "▶ Abspielen"));
+  player.addEventListener("click", togglePlay);
+  seek.addEventListener("input", () => { seeking = true; $("time").textContent = `${fmtTime(seek.value)} / ${fmtTime(duration())}`; });
+  seek.addEventListener("change", () => { player.currentTime = Number(seek.value); seeking = false; });
+
+  $("btnPlay").onclick = togglePlay;
+  $("btnBack10").onclick = () => jump(-10);
+  $("btnBack30").onclick = () => jump(-30);
+  $("btnFwd10").onclick = () => jump(10);
+  $("btnFwd30").onclick = () => jump(30);
+  $("speed").onchange = (e) => (player.playbackRate = Number(e.target.value));
+  $("btnFull").onclick = () => (player.requestFullscreen ? player.requestFullscreen() : player.webkitEnterFullscreen && player.webkitEnterFullscreen());
+
+  document.addEventListener("keydown", (e) => {
+    if ($("view-player").classList.contains("hidden")) return;
+    if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName) && document.activeElement !== seek) return;
+    if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+    else if (e.code === "ArrowLeft") { e.preventDefault(); jump(e.shiftKey ? -30 : -10); }
+    else if (e.code === "ArrowRight") { e.preventDefault(); jump(e.shiftKey ? 30 : 10); }
+    else if (e.code === "KeyF") { $("btnFull").click(); }
+  });
+
+  // Externe Datei öffnen
+  $("btnOpenFile").onclick = () => $("fileInput").click();
+  $("fileInput").onchange = (e) => {
+    const f = e.target.files[0];
+    if (f) loadVideo(f, f.name, null, 0);
+    e.target.value = "";
+  };
+
+  // ---------- Start ----------
+  (async () => {
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
+      setStatus("Dieser Browser unterstützt keine Videoaufnahme");
+      $("btnStart").disabled = $("btnScreen").disabled = true;
+    } else {
+      navigator.mediaDevices.addEventListener && navigator.mediaDevices.addEventListener("devicechange", listDevices);
+      listDevices();
+      if (!navigator.mediaDevices.getDisplayMedia) $("btnScreen").classList.add("hidden");
+    }
+    try {
+      db = await openDB();
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+      renderList();
+    } catch (e) {
+      $("list").innerHTML = '<li class="empty">Browserspeicher nicht verfügbar. Aufnahmen werden direkt heruntergeladen.</li>';
+    }
+  })();
+})();
+</script>
+</body>
+</html>
